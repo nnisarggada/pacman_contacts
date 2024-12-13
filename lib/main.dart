@@ -4,11 +4,11 @@ import 'package:pacman_contacts/contact.dart';
 import 'package:pacman_contacts/theme.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const Contacts());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class Contacts extends StatelessWidget {
+  const Contacts({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -23,20 +23,20 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
         colorScheme: MaterialTheme.darkScheme(),
       ),
-      home: const MyHomePage(title: 'Contacts'),
+      home: const HomePage(title: 'Contacts'),
     );
   }
 }
 
-class MyHomePage extends StatefulWidget {
+class HomePage extends StatefulWidget {
   final String title;
-  const MyHomePage({super.key, required this.title});
+  const HomePage({super.key, required this.title});
 
   @override
-  State<MyHomePage> createState() => _MyHomePageState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _MyHomePageState extends State<MyHomePage> {
+class _HomePageState extends State<HomePage> {
   List<Contact>? _contacts;
   List<Contact>? _filteredContacts;
   bool _permissionDenied = false;
@@ -52,14 +52,28 @@ class _MyHomePageState extends State<MyHomePage> {
   }
 
   @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_permissionDenied) {
-      return Center(
-          child: Text('Permission denied',
-              style: TextStyle(color: Colors.red, fontSize: 18)));
+      return Scaffold(
+        body: Center(
+          child: Text(
+            'Permission denied',
+            style: TextStyle(color: Colors.red, fontSize: 18),
+          ),
+        ),
+      );
     }
+
     if (_contacts == null) {
-      return Center(child: CircularProgressIndicator());
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     return SafeArea(
@@ -75,9 +89,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   Text(
                     '${_contacts?.length ?? 0} contacts',
                     style: TextStyle(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w200),
+                      color: Theme.of(context).colorScheme.primary,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w200,
+                    ),
                   ),
                   SizedBox(height: 10),
                   _buildSearchBar(),
@@ -85,21 +100,13 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ),
             Expanded(
-              child: _contacts!.isEmpty
-                  ? Center(
-                      child: Text('No contacts available.',
-                          style: TextStyle(fontSize: 18, color: Colors.grey)))
-                  : ListView.builder(
-                      itemCount: searchController.text.isEmpty
-                          ? _contacts!.length
-                          : _filteredContacts!.length,
-                      itemBuilder: (context, i) {
-                        final contact = searchController.text.isEmpty
-                            ? _contacts![i]
-                            : _filteredContacts![i];
-                        return _buildContactTile(contact);
-                      },
-                    ),
+              child: ListView.builder(
+                itemCount: _filteredContacts?.length ?? 0,
+                itemBuilder: (context, index) {
+                  final contact = _filteredContacts![index];
+                  return _buildContactTile(contact);
+                },
+              ),
             ),
           ],
         ),
@@ -107,7 +114,6 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  // Builds the custom search bar
   Widget _buildSearchBar() {
     return TextField(
       controller: searchController,
@@ -122,6 +128,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 icon: Icon(Icons.clear),
                 onPressed: () {
                   searchController.clear();
+                  _filterContacts(); // Clear the search results
                 },
               )
             : null,
@@ -130,7 +137,6 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  // Builds the ListTile for each contact
   Widget _buildContactTile(Contact contact) {
     return Card(
       margin: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -143,16 +149,11 @@ class _MyHomePageState extends State<MyHomePage> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
         ),
         onTap: () async {
-          try {
-            final fullContact = await FlutterContacts.getContact(contact.id);
-            if (fullContact != null) {
-              await Navigator.of(context).push(
-                MaterialPageRoute(builder: (_) => ContactPage(fullContact)),
-              );
-            }
-          } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Failed to load contact details')));
+          final fullContact = await FlutterContacts.getContact(contact.id);
+          if (fullContact != null) {
+            await Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => ContactPage(fullContact)),
+            );
           }
         },
         leading: CircleAvatar(
@@ -164,12 +165,9 @@ class _MyHomePageState extends State<MyHomePage> {
                   : null,
           child: contact.photo == null && contact.thumbnail == null
               ? Text(
-                  contact.name.first.isEmpty
-                      ? '?'
-                      : contact.name.last.isEmpty
-                          ? contact.name.first[0]
-                          : contact.name.first[0] + contact.name.last[0],
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600))
+                  contact.name.first.isNotEmpty ? contact.name.first[0] : '?',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+                )
               : null,
         ),
         trailing: Icon(Icons.chevron_right),
@@ -177,62 +175,43 @@ class _MyHomePageState extends State<MyHomePage> {
     );
   }
 
-  // Fetch contacts from FlutterContacts package
-  Future _fetchContacts() async {
+  Future<void> _fetchContacts() async {
     if (!await FlutterContacts.requestPermission(readonly: true)) {
-      setState(() => _permissionDenied = true);
-    } else {
-      final contacts = await FlutterContacts.getContacts(
-        withProperties: true,
-        withPhoto: true,
-        withThumbnail: true,
-        withGroups: true,
-        withAccounts: true,
-      );
-      setState(() => _contacts = contacts);
-    }
-  }
-
-  // Filters contacts based on search query
-  void _filterContacts() {
-    List<Contact> contacts = [];
-    contacts.addAll(_contacts!);
-    if (searchController.text.isNotEmpty) {
-      contacts.retainWhere((contact) {
-        String searchTerm = searchController.text.toLowerCase();
-        String displayName = contact.displayName.toLowerCase();
-        bool nameMatches = displayName.contains(searchTerm);
-
-        if (nameMatches) {
-          return true;
-        }
-
-        var phone = contact.phones.firstWhere(
-          (phone) => flattenPhoneNumber(phone.number)
-              .contains(flattenPhoneNumber(searchTerm)),
-          orElse: () => Phone(''), // Provide a default empty object
-        );
-
-        var email = contact.emails.firstWhere(
-          (email) =>
-              flattenEmail(email.address).contains(flattenEmail(searchTerm)),
-          orElse: () => Email(''), // Provide a default empty object
-        );
-
-        return (phone.number.isNotEmpty || email.address.isNotEmpty);
+      setState(() {
+        _permissionDenied = true;
       });
+      return;
     }
+
+    final contacts = await FlutterContacts.getContacts(
+      withProperties: true,
+      withPhoto: true,
+    );
 
     setState(() {
-      _filteredContacts = contacts;
+      _contacts = contacts;
+      _filteredContacts = List.from(_contacts!); // Initialize filtered contacts
     });
   }
 
-  String flattenEmail(String email) {
-    return email.replaceAll(RegExp(r'\s+\b|\b\s'), '');
-  }
+  void _filterContacts() {
+    if (searchController.text.isEmpty) {
+      setState(() {
+        _filteredContacts = List.from(_contacts!);
+      });
+      return;
+    }
 
-  String flattenPhoneNumber(String phoneNumber) {
-    return phoneNumber.replaceAll(RegExp(r'^(\+)|\D'), '');
+    final query = searchController.text.toLowerCase();
+    setState(() {
+      _filteredContacts = _contacts!.where((contact) {
+        final nameMatch = contact.displayName.toLowerCase().contains(query);
+        final phoneMatch = contact.phones.any((phone) =>
+            phone.number.replaceAll(RegExp(r'\D'), '').contains(query));
+        final emailMatch = contact.emails
+            .any((email) => email.address.toLowerCase().contains(query));
+        return nameMatch || phoneMatch || emailMatch;
+      }).toList();
+    });
   }
 }
