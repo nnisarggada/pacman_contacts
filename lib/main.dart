@@ -13,6 +13,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'Contacts',
       theme: ThemeData(
         useMaterial3: true,
@@ -231,7 +232,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return email.replaceAll(RegExp(r'\s+\b|\b\s'), '');
   }
 
-  String flattenPhoneNumber(String phoneNunber) {
-    return phoneNunber.replaceAll(RegExp(r'^(\+)|\D'), '');
+  String flattenPhoneNumber(String phoneNumber) {
+    return phoneNumber.replaceAll(RegExp(r'^(\+)|\D'), '');
   }
 }
