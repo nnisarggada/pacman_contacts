@@ -165,7 +165,11 @@ class _HomePageState extends State<HomePage> {
                   : null,
           child: contact.photo == null && contact.thumbnail == null
               ? Text(
-                  contact.name.first.isNotEmpty ? contact.name.first[0] : '?',
+                  contact.name.first.isEmpty
+                      ? '?'
+                      : contact.name.last.isEmpty
+                          ? contact.name.first[0]
+                          : contact.name.first[0] + contact.name.last[0],
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
                 )
               : null,
